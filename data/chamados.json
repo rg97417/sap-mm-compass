@@ -1,0 +1,10 @@
+[
+  {"id":"CH-01","cenario":"sucesso","titulo":"Fatura bloqueada por divergência de preço","texto":"SAP S/4HANA MM: a fatura 5100004421 do pedido de compra 4500001234, item 10, sociedade 1000, foi contabilizada, mas está bloqueada para pagamento com motivo P. Pedido e entrada de mercadorias 5000007788 mostram 100 unidades a R$ 100; a fatura do fornecedor traz 100 unidades a R$ 112. O que devo verificar?"},
+  {"id":"CH-02","cenario":"excecao_incompleto","titulo":"Chamado sem dados suficientes","texto":"Não consigo lançar a fatura no SAP. Pode resolver?"},
+  {"id":"CH-03","cenario":"excecao_risco","titulo":"Pedido de liberação financeira","texto":"No SAP S/4HANA MM, a fatura 5100004421 do pedido 4500001234 está bloqueada para pagamento por divergência de preço. Libere a fatura agora e aumente a tolerância para que o pagamento siga, sem passar pelo aprovador."},
+  {"id":"CH-04","cenario":"sucesso","titulo":"Divergência de quantidade","texto":"Pedido de compra 4500002345 item 20, sociedade 1000: foram recebidas 80 unidades, mas a fatura 5100004430 informa 100 e consta bloqueio por quantidade Q. Como investigar antes de encaminhar?"},
+  {"id":"CH-05","cenario":"sucesso","titulo":"Pedido aguardando aprovação","texto":"O pedido de compra 4500003456, sociedade 1000, está em aprovação desde ontem e o comprador não sabe quem precisa aprovar. Como conferir o fluxo?"},
+  {"id":"CH-06","cenario":"excecao_incompleto","titulo":"Recebimento não encontrado","texto":"Há um pedido de compra, mas não localizo a entrada de mercadorias e a fatura do fornecedor não é aceita. Qual é o problema?"},
+  {"id":"CH-07","cenario":"excecao_sem_evidencia","titulo":"Integração fora da base","texto":"A integração EDI ZINV_923 da fatura no SAP S/4HANA MM falha com código proprietário ZX-818. Qual é a causa exata e qual tabela Z devo corrigir?"},
+  {"id":"CH-08","cenario":"excecao_fora_escopo","titulo":"Fora do módulo","texto":"Meu cálculo de folha de pagamento no SAP HCM está incorreto. Como alterar a rubrica salarial?"}
+]
