@@ -9,8 +9,8 @@ Assistente de triagem de chamados para **SAP S/4HANA MM**, no processo pedido de
 Requer Python 3.10+ e uma chave de API de um endpoint compatível com OpenAI Chat Completions.
 
 ```bash
-git clone <URL-DESTE-REPOSITORIO>
-cd SAP_IA
+git clone https://github.com/rg97417/sap-mm-compass.git
+cd sap-mm-compass
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
