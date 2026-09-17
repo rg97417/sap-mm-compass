@@ -98,23 +98,69 @@ class AssistantTests(unittest.TestCase):
         self.assertEqual(result["status"], "human_review")
         self.assertTrue(result["human_review_required"])
         self.assertEqual(result["confidence"], "low")
-        self.assertEqual(result["checks"], ["Consultar status do pedido."])
+        self.assertEqual(result["checks"], [])
+        self.assertNotIn("SQL", result["summary"])
 
-    def test_llm_unsafe_check_is_suppressed_even_for_diagnostic_request(self):
-        response = json.dumps({"summary": "Investigar liberação", "probable_causes": [], "checks": ["Libere o pedido agora.", "Consultar status do pedido."], "questions": [], "risks": [], "source_ids": ["approval-1"], "confidence": "high", "human_review_required": False})
-        result = SAPTicketAssistant(self.kb, self.log, FakeLLM(response=response)).answer("No pedido de compra 4500000123, a liberação falha com erro de estratégia de aprovação não determinada.")
-        self.assertEqual(result["status"], "human_review")
-        self.assertEqual(result["checks"], ["Consultar status do pedido."])
+    def test_llm_unsafe_output_in_any_field_is_blocked(self):
+        unsafe_by_field = {
+            "summary": "Execute SQL UPDATE direto no banco e libere a fatura.",
+            "probable_causes": ["Altere a tolerância em produção."],
+            "checks": ["Libere o pedido agora."],
+            "questions": ["Desbloqueie a fatura agora?"],
+            "risks": ["Estorne o documento em produção."],
+        }
+        for field, unsafe_value in unsafe_by_field.items():
+            with self.subTest(field=field):
+                payload = {"summary": "Investigar a falha.", "probable_causes": [], "checks": ["Consultar status do pedido."], "questions": [], "risks": [], "source_ids": ["approval-1"], "confidence": "high", "human_review_required": False}
+                payload[field] = unsafe_value
+                result = SAPTicketAssistant(self.kb, self.log, FakeLLM(response=json.dumps(payload))).answer("No pedido de compra 4500000123, a liberação falha com erro de estratégia de aprovação não determinada.")
+                self.assertEqual(result["status"], "human_review")
+                self.assertTrue(result["human_review_required"])
+                self.assertEqual(result["probable_causes"], [])
+                self.assertEqual(result["checks"], [])
+                self.assertNotIn("SQL", result["summary"])
 
     def test_confidence_cannot_be_high_without_live_sap_verification(self):
         response = json.dumps({"summary": "Hipótese condicionada", "probable_causes": [], "checks": ["Consultar status do pedido."], "questions": [], "risks": [], "source_ids": ["approval-1"], "confidence": "high", "human_review_required": False})
         result = SAPTicketAssistant(self.kb, self.log, FakeLLM(response=response)).answer("No pedido de compra 4500000123, a liberação falha com erro de estratégia de aprovação não determinada.")
         self.assertEqual(result["confidence"], "medium")
 
+    def test_conditional_release_in_risks_is_blocked(self):
+        response = json.dumps({"summary": "Triagem", "probable_causes": [], "checks": ["Consultar status do pedido."], "questions": [], "risks": ["A fatura pode ser liberada e contabilizada."], "source_ids": ["approval-1"], "confidence": "medium", "human_review_required": False})
+        result = SAPTicketAssistant(self.kb, self.log, FakeLLM(response=response)).answer("No pedido de compra 4500000123, a liberação falha com erro de estratégia de aprovação não determinada.")
+        self.assertEqual(result["status"], "human_review")
+        self.assertNotIn("pode ser liberada", json.dumps(result, ensure_ascii=False))
+
+    def test_read_only_checks_do_not_require_human_approval(self):
+        response = json.dumps({"summary": "Hipótese de workflow", "probable_causes": [], "checks": ["Consultar a etapa atual do pedido."], "questions": [], "risks": [], "source_ids": ["approval-1"], "confidence": "medium", "human_review_required": True})
+        result = SAPTicketAssistant(self.kb, self.log, FakeLLM(response=response)).answer("No pedido de compra 4500000123, a liberação falha com erro de estratégia de aprovação não determinada.")
+        self.assertEqual(result["status"], "answered")
+        self.assertFalse(result["human_review_required"])
+
+    def test_human_approval_warning_is_kept_as_risk(self):
+        response = json.dumps({"summary": "Hipótese de workflow", "probable_causes": [], "checks": ["Consultar a etapa atual do pedido."], "questions": [], "risks": ["Eventual liberação exige validação humana antes de alteração em controles."], "source_ids": ["approval-1"], "confidence": "medium", "human_review_required": True})
+        result = SAPTicketAssistant(self.kb, self.log, FakeLLM(response=response)).answer("No pedido de compra 4500000123, a liberação falha com erro de estratégia de aprovação não determinada.")
+        self.assertEqual(result["status"], "answered")
+        self.assertIn("responsável autorizado", result["risks"][0])
+
+    def test_unverified_tolerance_claim_is_qualified(self):
+        response = json.dumps({"summary": "Hipótese de divergência", "probable_causes": ["A divergência excedeu a tolerância configurada."], "checks": ["Consultar os valores e a configuração aplicável."], "questions": [], "risks": [], "source_ids": ["approval-1"], "confidence": "medium", "human_review_required": False})
+        result = SAPTicketAssistant(self.kb, self.log, FakeLLM(response=response)).answer("No pedido de compra 4500000123, a liberação falha com erro de estratégia de aprovação não determinada.")
+        self.assertEqual(result["status"], "answered")
+        self.assertIn("pode ter excedido a tolerância", result["probable_causes"][0])
+        self.assertNotIn("A divergência excedeu", result["probable_causes"][0])
+
     def test_risky_request_escalates_without_llm_key(self):
         result = SAPTicketAssistant(self.kb, self.log).answer("No pedido de compra 4500000123, a liberação falha com erro; libere o pedido agora sem aprovação.")
         self.assertEqual(result["status"], "human_review")
         self.assertTrue(result["human_review_required"])
+
+    def test_short_risky_request_requires_human_review_before_completeness(self):
+        llm = FakeLLM()
+        result = SAPTicketAssistant(self.kb, self.log, llm).answer("Libere a fatura agora sem passar pelo aprovador.")
+        self.assertEqual(result["status"], "human_review")
+        self.assertTrue(result["human_review_required"])
+        self.assertEqual(llm.calls, [])
 
     def test_undocumented_custom_code_has_no_generic_guess(self):
         result = SAPTicketAssistant(self.kb, self.log, FakeLLM()).answer("A integração EDI ZINV_923 da fatura no SAP S/4HANA MM falha com código proprietário ZX-818. Qual tabela Z corrigir?")
@@ -128,6 +174,21 @@ class AssistantTests(unittest.TestCase):
         self.assertNotIn("segredo123", content)
         self.assertNotIn("pessoa@example.com", content)
         self.assertIn("[REDACTED]", content)
+
+    def test_llm_prompt_redacts_ticket_secrets_and_personal_data(self):
+        llm = FakeLLM()
+        SAPTicketAssistant(self.kb, self.log, llm).answer(
+            "No pedido de compra 4500000123 ligado à fatura 5100000999, a liberação falha com erro. "
+            "senha=segredo123 pessoa@example.com; erro de estratégia de aprovação."
+        )
+        prompt = llm.calls[0][1]
+        self.assertNotIn("segredo123", prompt)
+        self.assertNotIn("pessoa@example.com", prompt)
+        self.assertNotIn("4500000123", prompt)
+        self.assertNotIn("5100000999", prompt)
+        self.assertIn("[DOC_1]", prompt)
+        self.assertIn("[DOC_2]", prompt)
+        self.assertIn("[REDACTED]", prompt)
 
     def test_openai_compatible_http_contract(self):
         received = {}

@@ -4,6 +4,7 @@
 |---|---|---|
 | Documentação local incompleta/desatualizada | Apenas cinco artigos e recusa quando não houver evidência | Curadoria, versionamento, validade por cliente e edição SAP |
 | Resposta plausível porém incorreta | Citações, validação de fontes e revisão humana para risco | Avaliação com chamados reais anonimizados e especialistas MM |
+| Citação válida com frase não sustentada | IDs são conferidos, mas não há prova semântica automática por afirmação | Citações por afirmação, revisão de especialista e avaliação de groundedness |
 | Confiança interpretada como probabilidade | Rótulo qualitativo associado à evidência disponível | Calibração com conjunto rotulado e métricas de erro |
 | Variações de configuração entre clientes | Não presume percentual de tolerância nem estado de documento | Consultas autorizadas a customizing e dados transacionais |
 | Prompt injection no chamado ou documento | Tratar conteúdo recuperado e entrada como dados; validar saída | Filtros adicionais, testes adversariais e monitoramento |

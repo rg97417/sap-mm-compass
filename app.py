@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 import streamlit as st
@@ -27,6 +29,20 @@ PROCESS = {
     "invoice_verification": "Verificação de fatura",
     "out_of_scope": "Fora do escopo",
 }
+
+
+def local_model_ready() -> bool:
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=0.35) as response:
+            models = json.load(response).get("models", [])
+        return any(item.get("name", "").startswith("qwen3.5:4b") for item in models)
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+        return False
+
+
+def safe_md(value: str) -> str:
+    """Keep currency symbols from becoming Markdown math delimiters."""
+    return value.replace("$", r"\$")
 
 
 st.set_page_config(page_title="MM Compass | Triagem SAP", page_icon="◈", layout="wide")
@@ -53,6 +69,7 @@ st.markdown(
     .status {display:inline-block;border:1px solid #d9a14e;background:#fff6e8;color:#79510f;border-radius:100px;padding:.38rem .82rem;font-family:'IBM Plex Mono',monospace;font-size:.8rem}
     .status.ok {border-color:#8cbaa1;background:#e8f4eb;color:#2a6146}
     .status.pending {border-color:#b8c2ca;background:#eef1f2;color:#36515b}
+    .status.review {border-color:#d68b59;background:#fff0e7;color:#8a3f21}
     .status.neutral {border-color:#ccc;background:#eee;color:#555}
     div[data-testid="stVerticalBlockBorderWrapper"] > div {border-color:var(--line) !important;background:#fffefa;border-radius:12px}
     div.stButton > button {border-radius:7px;font-weight:700;min-height:2.8rem}
@@ -69,17 +86,24 @@ with st.sidebar:
     st.header("Painel de casos")
     st.caption("SAP S/4HANA · Materials Management · Procure to Pay")
     labels = {case["id"]: f'{case["id"]} · {case["titulo"]}' for case in CASES}
-    selection = st.selectbox("Chamado fictício", options=["personalizado"] + list(labels), format_func=lambda x: "Escrever meu chamado" if x == "personalizado" else labels[x])
+    selection = st.selectbox("Chamado fictício", options=["personalizado"] + list(labels), index=1, format_func=lambda x: "Escrever meu chamado" if x == "personalizado" else labels[x])
     selected = next((case for case in CASES if case["id"] == selection), None)
     st.divider()
     st.markdown("**Configuração do modelo**")
+    provider = st.radio("Provedor", ["OpenAI API", "Ollama local"], index=1 if local_model_ready() else 0, horizontal=True)
     env_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY") or ""
-    typed_key = st.text_input("Chave da API", type="password", help="Usada somente nesta sessão. Nunca entra no log.")
-    api_key = typed_key or env_key
-    model = st.text_input("Modelo", value=os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
-    base_url = st.text_input("Endpoint compatível", value=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"))
-    if not api_key:
-        st.caption("Informe uma chave para gerar respostas com o LLM. Os casos e a base podem ser inspecionados sem ela.")
+    if provider == "OpenAI API":
+        typed_key = st.text_input("Chave da API", type="password", help="Usada somente nesta sessão. Nunca entra no log.")
+        api_key = typed_key or env_key
+        model = st.text_input("Modelo", value=os.getenv("OPENAI_MODEL", "gpt-4o-mini"), key="openai_model")
+        base_url = "https://api.openai.com/v1"
+        if not api_key:
+            st.caption("Informe uma chave para gerar respostas com o LLM. Os casos e a base podem ser inspecionados sem ela.")
+    else:
+        api_key = "ollama"
+        model = st.text_input("Modelo local", value="qwen3.5:4b", key="ollama_model")
+        base_url = "http://127.0.0.1:11434/v1"
+        st.caption("Requer Ollama em execução e o modelo instalado. O chamado fica nesta máquina.")
     st.divider()
     st.caption("Leitura e orientação apenas. Nenhuma operação é enviada ao SAP.")
 
@@ -105,7 +129,7 @@ with right:
         st.markdown("<div class='subtle'>As fontes oficiais apoiam o diagnóstico; os números dos chamados são simulados.</div>", unsafe_allow_html=True)
 
 if go:
-    llm = OpenAICompatibleClient(api_key, model, base_url) if api_key else None
+    llm = OpenAICompatibleClient(api_key, model, base_url, timeout=120 if provider == "Ollama local" else 35) if api_key else None
     assistant = SAPTicketAssistant(ROOT / "knowledge", ROOT / "logs/requests.jsonl", llm=llm)
     with st.spinner("Consultando a base e validando a resposta..."):
         st.session_state["result"] = assistant.answer(ticket)
@@ -116,7 +140,9 @@ if "result" in st.session_state:
     label, tone = STATUS.get(result["status"], (result["status"], "neutral"))
     st.markdown("<div class='section-kicker'>03 / Resultado da triagem</div>", unsafe_allow_html=True)
     st.markdown(f"<span class='status {tone}'>{label}</span>", unsafe_allow_html=True)
-    st.subheader(result["summary"])
+    st.subheader(safe_md(result["summary"]))
+    if "[DOC_" in json.dumps(result, ensure_ascii=False):
+        st.caption("DOC_1, DOC_2... são identificadores mascarados antes do envio ao modelo; os documentos originais constam apenas no chamado local.")
     meta1, meta2, meta3 = st.columns(3)
     meta1.metric("Processo", PROCESS.get(result["process"], result["process"]))
     meta2.metric("Confiança", {"low": "Baixa", "medium": "Média", "high": "Alta"}.get(result["confidence"], "Baixa"))
@@ -127,20 +153,20 @@ if "result" in st.session_state:
         if result["probable_causes"]:
             st.markdown("#### Causas possíveis")
             for item in result["probable_causes"]:
-                st.markdown(f"- {item}")
+                st.markdown(f"- {safe_md(item)}")
         if result["questions"]:
             st.markdown("#### Informações necessárias")
             for item in result["questions"]:
-                st.markdown(f"- {item}")
+                st.markdown(f"- {safe_md(item)}")
     with col_b:
         if result["checks"]:
             st.markdown("#### Verificações recomendadas")
             for item in result["checks"]:
-                st.markdown(f"- {item}")
+                st.markdown(f"- {safe_md(item)}")
         if result["risks"]:
             st.markdown("#### Limites e riscos")
             for item in result["risks"]:
-                st.markdown(f"- {item}")
+                st.markdown(f"- {safe_md(item)}")
 
     with st.expander(f'Fontes recuperadas ({len(result["sources"])})', expanded=True):
         if result["sources"]:

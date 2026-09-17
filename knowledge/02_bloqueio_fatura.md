@@ -5,6 +5,7 @@ Escopo: verificação de fatura com referência ao pedido ou entrada de mercador
 ## Fatos fundamentados
 
 - O SAP compara dados da fatura com valores esperados do pedido ou da entrada. Divergências de preço, quantidade, valor do item ou outras condições podem levar a bloqueio, conforme configuração.
+- Na documentação SAP, o motivo **P** indica divergência de preço e o motivo **Q** indica divergência de quantidade no item da fatura.
 - Uma fatura com divergência acima da tolerância pode ser contabilizada e ficar bloqueada para pagamento. Não confundir bloqueio de pagamento com falha de contabilização.
 - O motivo de bloqueio pode ser automático, manual ou estocástico. O código de motivo e os documentos devem ser verificados antes de atribuir uma causa.
 - A liberação de uma fatura bloqueada é uma decisão financeira controlada. O assistente apenas orienta a análise; não executa liberação.

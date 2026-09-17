@@ -6,7 +6,7 @@ Assistente de triagem de chamados para **SAP S/4HANA MM**, no processo pedido de
 
 ## Executar em cinco minutos
 
-Requer Python 3.10+ e uma chave de API de um endpoint compatível com OpenAI Chat Completions.
+Requer Python 3.10+. Há duas opções de LLM: API OpenAI com chave ou Ollama local. O cliente usa a interface Chat Completions com `response_format: json_object`.
 
 ```bash
 git clone https://github.com/rg97417/sap-mm-compass.git
@@ -18,7 +18,31 @@ export OPENAI_API_KEY="sua-chave"
 streamlit run app.py
 ```
 
-Abra o endereço local mostrado pelo Streamlit. É possível informar a chave diretamente no painel lateral; ela não é gravada nos logs. O modelo padrão é `gpt-4o-mini`. Para outro endpoint compatível, configure `OPENAI_MODEL` e `OPENAI_BASE_URL` ou ajuste no painel.
+Abra o endereço local mostrado pelo Streamlit. É possível informar a chave diretamente no painel lateral; ela não é gravada nos logs. O modelo padrão da opção OpenAI é `gpt-4o-mini`.
+
+### Rodar sem chave com Ollama
+
+Em um Mac com Homebrew:
+
+```bash
+brew install ollama
+ollama serve
+```
+
+Em outro terminal:
+
+```bash
+ollama pull qwen3.5:4b
+streamlit run app.py
+```
+
+No painel, selecione **Ollama local**. O [modelo Qwen3.5 4B](https://ollama.com/library/qwen3.5%3A4b) é baixado para a máquina do avaliador e não faz parte do repositório. Também funciona pela CLI:
+
+```bash
+OPENAI_API_KEY=ollama OPENAI_BASE_URL=http://127.0.0.1:11434/v1 OPENAI_MODEL=qwen3.5:4b python cli.py --case CH-01
+```
+
+Para outro endpoint compatível na CLI, configure `OPENAI_MODEL`, `OPENAI_BASE_URL` e `OPENAI_API_KEY`; ele precisa aceitar `response_format: json_object`. Use somente um endpoint confiável, pois o chamado é enviado a ele.
 
 Teste também no terminal:
 
@@ -29,7 +53,7 @@ python cli.py --case CH-03
 python cli.py --text "Pedido de compra 4500003456 está em aprovação; quem analisa?"
 ```
 
-Sem chave, os casos que exigem geração retornam um erro explícito; as regras de escopo, completude e ausência de evidência ainda podem ser demonstradas. O caminho do LLM é real e precisa de uma chave para produzir a resposta fundamentada.
+Sem um LLM configurado, os casos que exigem geração retornam um erro explícito; as regras de escopo, completude e ausência de evidência ainda podem ser demonstradas. O caminho do LLM é real e foi projetado para OpenAI ou Ollama local.
 
 ## O que mostrar na avaliação
 
@@ -57,8 +81,8 @@ flowchart LR
 
 - **RAG:** cada artigo Markdown é dividido por cabeçalho. O recuperador seleciona trechos relevantes com pontuação lexical. A resposta do LLM só pode citar IDs dos trechos fornecidos. Para esta base pequena, a busca simples é auditável e não requer banco vetorial.
 - **Prompt engineering:** define papel, escopo, formato JSON, regras contra invenção e instrução para tratar texto do chamado e da base como dados não confiáveis.
-- **Freios:** chamados incompletos geram perguntas; códigos proprietários sem documentação geram falta de evidência; ações sensíveis geram revisão humana. Citações inválidas são descartadas e uma saída sem fonte válida não é publicada como orientação.
-- **Auditoria:** `logs/requests.jsonl` guarda solicitação, resposta e fontes consultadas. Segredos e alguns dados pessoais são mascarados. A pasta é ignorada pelo Git.
+- **Freios:** chamados incompletos geram perguntas; códigos proprietários sem documentação geram falta de evidência; ações sensíveis geram revisão humana. Citações inválidas são descartadas; uma saída sem fonte válida ou com recomendação de ação controlada não é publicada como orientação. IDs de fonte dão rastreabilidade, mas não provam automaticamente cada frase do modelo.
+- **Privacidade e auditoria:** identificadores longos, segredos e alguns dados pessoais são mascarados antes do envio ao LLM; identificadores de documentos recebem aliases distintos. `logs/requests.jsonl` guarda solicitação, resposta e fontes consultadas com mascaramento. A pasta é ignorada pelo Git.
 
 Detalhes e diagrama completo: [docs/arquitetura.md](docs/arquitetura.md). Limitações e próximos passos: [docs/riscos_e_proximos_passos.md](docs/riscos_e_proximos_passos.md).
 
@@ -69,7 +93,7 @@ python3 -m unittest discover -s tests -v
 python3 -m py_compile app.py cli.py src/assistant.py
 ```
 
-Os testes injetam um LLM falso apenas para verificar fluxo, validação de fontes, tratamento de risco e registro. Isso **não equivale** a validar a qualidade factual do modelo real; na apresentação, rode CH-01 com uma chave para demonstrar a geração de verdade. Evidências das execuções verificadas neste ambiente ficam em [docs/evidencias.md](docs/evidencias.md).
+Os testes injetam um LLM falso apenas para verificar fluxo, validação de fontes, tratamento de risco e registro; também testam o contrato HTTP contra um servidor local. Isso **não equivale** a validar a qualidade factual do modelo real. Na apresentação, rode CH-01 com OpenAI ou Ollama para demonstrar a geração. Evidências das execuções verificadas neste ambiente ficam em [docs/evidencias.md](docs/evidencias.md).
 
 ## Fontes e decisões
 
