@@ -1,6 +1,6 @@
 # MM Compass
 
-Assistente de triagem de chamados para **SAP S/4HANA MM**, no processo pedido de compra → entrada de mercadorias → verificação de fatura. É uma prova de conceito com oito chamados fictícios e cinco artigos locais baseados em documentação oficial SAP. O assistente interpreta o relato, recupera evidências, gera uma orientação com LLM e sinaliza quando deve perguntar ou encaminhar a um consultor.
+Assistente de triagem de chamados para **SAP S/4HANA MM**, no processo pedido de compra → entrada de mercadorias → verificação de fatura. É uma prova de conceito com sete chamados fictícios desse recorte e um oitavo chamado adversarial de SAP HCM para demonstrar o tratamento fora do escopo, além de cinco artigos locais baseados em documentação oficial SAP. O assistente interpreta o relato, recupera evidências, gera uma orientação com LLM e sinaliza quando deve perguntar ou encaminhar a um consultor.
 
 > O protótipo não se conecta ao SAP e não executa liberações, lançamentos ou alterações. Números de documentos e situações dos chamados são fictícios.
 
@@ -65,7 +65,7 @@ Sem um LLM configurado, os casos que exigem geração retornam um erro explícit
 | CH-07 | Código Z sem documentação local: declara evidência insuficiente |
 | CH-08 | SAP HCM: fora do escopo |
 
-Os oito casos estão em [data/chamados.json](data/chamados.json). O roteiro de 20 minutos está em [docs/apresentacao.md](docs/apresentacao.md).
+Os oito casos estão em [data/chamados.json](data/chamados.json): sete pertencem ao recorte MM e o CH-08 é a entrada adversarial fora do escopo. O roteiro de 20 minutos está em [docs/apresentacao.md](docs/apresentacao.md).
 
 ## Como funciona
 

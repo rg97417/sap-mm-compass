@@ -224,5 +224,21 @@ class AssistantTests(unittest.TestCase):
         self.assertEqual(received["body"]["response_format"], {"type": "json_object"})
 
 
+class ChallengeDatasetTests(unittest.TestCase):
+    def test_required_case_count_and_scenarios_are_present(self):
+        root = Path(__file__).resolve().parents[1]
+        cases = json.loads((root / "data" / "chamados.json").read_text(encoding="utf-8"))
+        ids = [case["id"] for case in cases]
+        in_scope = [case for case in cases if case["cenario"] != "excecao_fora_escopo"]
+        exceptions = [case for case in cases if case["cenario"].startswith("excecao_")]
+
+        self.assertEqual(len(ids), len(set(ids)), "IDs de chamados devem ser únicos")
+        self.assertGreaterEqual(len(in_scope), 5)
+        self.assertLessEqual(len(in_scope), 10)
+        self.assertTrue(any(case["cenario"] == "sucesso" for case in in_scope))
+        self.assertGreaterEqual(len(exceptions), 2)
+        self.assertTrue(any(case["cenario"] == "excecao_fora_escopo" for case in cases))
+
+
 if __name__ == "__main__":
     unittest.main()
