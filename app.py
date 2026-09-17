@@ -29,6 +29,14 @@ PROCESS = {
     "invoice_verification": "Verificação de fatura",
     "out_of_scope": "Fora do escopo",
 }
+SCENARIO = {
+    "sucesso": "Sucesso",
+    "triagem_adicional": "Triagem adicional",
+    "excecao_incompleto": "Exceção · dados incompletos",
+    "excecao_risco": "Exceção · ação de risco",
+    "excecao_sem_evidencia": "Exceção · sem evidência",
+    "excecao_fora_escopo": "Exceção · fora do escopo",
+}
 
 
 def local_model_ready() -> bool:
@@ -45,37 +53,56 @@ def safe_md(value: str) -> str:
     return value.replace("$", r"\$")
 
 
+def load_case() -> None:
+    """Keep the editor and result synchronized with the selected demo case."""
+    selection = st.session_state.get("case_selection", "CH-01")
+    selected_case = next((case for case in CASES if case["id"] == selection), None)
+    st.session_state["ticket_text"] = selected_case["texto"] if selected_case else ""
+    st.session_state.pop("result", None)
+
+
 st.set_page_config(page_title="MM Compass | Triagem SAP", page_icon="◈", layout="wide")
 st.markdown(
     """
     <style>
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
-    :root { --ink:#18352e; --muted:#62766c; --line:#d8e0d8; --paper:#f4f4ef; --accent:#dc8f32; }
+    :root { --ink:#12372d; --muted:#62766c; --line:#d7dfd8; --paper:#f5f5ef; --accent:#d7933d; --white:#fffefa; }
     html, body, [class*="css"], [data-testid="stApp"] {font-family:'DM Sans',sans-serif;color:var(--ink)}
-    [data-testid="stApp"] {background: radial-gradient(circle at 92% 0%, #e5efdf 0%, transparent 30%), var(--paper)}
-    [data-testid="stSidebar"] {background:#17352d;color:#eef1e7}
+    [data-testid="stApp"] {background:radial-gradient(circle at 88% -5%, #dcebdd 0%, transparent 27%),linear-gradient(180deg,#f8f8f3 0%,var(--paper) 100%)}
+    [data-testid="stSidebar"] {background:linear-gradient(180deg,#143a30 0%,#102f27 100%);color:#eef1e7;border-right:1px solid #284c42}
     [data-testid="stSidebar"] * {color:#eef1e7}
     [data-testid="stSidebar"] input,
     [data-testid="stSidebar"] [role="combobox"],
     [data-testid="stSidebar"] [data-baseweb="select"] * {color:#18352e !important}
     [data-testid="stSidebar"] .stCaption {color:#b8c8bd}
-    .block-container {max-width:1320px;padding-top:4.5rem;padding-bottom:3rem}
+    .block-container {max-width:1180px;padding-top:3.4rem;padding-bottom:3rem}
     h1,h2,h3 {color:var(--ink);letter-spacing:-.045em}
-    h1 {font-family:Georgia,serif;font-size:3.2rem !important;line-height:1.02 !important;font-weight:400 !important}
+    h1 {font-family:Georgia,serif;font-size:3rem !important;line-height:1.03 !important;font-weight:400 !important;max-width:850px}
     h2 {font-family:Georgia,serif;font-weight:400 !important}
     .eyebrow {font-family:'IBM Plex Mono',monospace;font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:#547165;margin-bottom:.65rem}
-    .hero-sub {color:var(--muted);font-size:1.08rem;max-width:720px;line-height:1.55;margin:.9rem 0 2rem}
+    .hero-sub {color:var(--muted);font-size:1.04rem;max-width:760px;line-height:1.55;margin:.8rem 0 1.5rem}
     .section-kicker {font-family:'IBM Plex Mono',monospace;font-size:.73rem;letter-spacing:.1em;color:#6b7d6f;text-transform:uppercase;margin-bottom:.35rem}
     .status {display:inline-block;border:1px solid #d9a14e;background:#fff6e8;color:#79510f;border-radius:100px;padding:.38rem .82rem;font-family:'IBM Plex Mono',monospace;font-size:.8rem}
     .status.ok {border-color:#8cbaa1;background:#e8f4eb;color:#2a6146}
     .status.pending {border-color:#b8c2ca;background:#eef1f2;color:#36515b}
     .status.review {border-color:#d68b59;background:#fff0e7;color:#8a3f21}
     .status.neutral {border-color:#ccc;background:#eee;color:#555}
-    div[data-testid="stVerticalBlockBorderWrapper"] > div {border-color:var(--line) !important;background:#fffefa;border-radius:12px}
-    div.stButton > button {border-radius:7px;font-weight:700;min-height:2.8rem}
+    .statline {display:flex;gap:1.8rem;flex-wrap:wrap;margin:0 0 1.8rem;padding:.8rem 1rem;border:1px solid var(--line);border-radius:10px;background:rgba(255,254,250,.72);box-shadow:0 10px 30px rgba(27,55,46,.035)}
+    .statline span {font-family:'IBM Plex Mono',monospace;font-size:.75rem;letter-spacing:.035em;color:#5c7167}
+    .statline strong {color:var(--ink);font-weight:600}
+    div[data-testid="stVerticalBlockBorderWrapper"] > div {border-color:var(--line) !important;background:var(--white);border-radius:12px;box-shadow:0 12px 35px rgba(29,61,50,.045)}
+    div.stButton > button {border-radius:8px;font-weight:700;min-height:2.9rem;transition:transform .16s ease,box-shadow .16s ease}
     div.stButton > button[kind="primary"] {background:#1e5441;border-color:#1e5441;color:white}
+    div.stButton > button[kind="primary"]:hover {background:#174635;border-color:#174635;transform:translateY(-1px);box-shadow:0 8px 18px rgba(23,70,53,.18)}
+    [data-testid="stMetric"] {background:var(--white);border:1px solid var(--line);border-radius:10px;padding:.8rem 1rem;min-height:92px}
+    [data-testid="stMetricLabel"] {color:#6a7b72;font-family:'IBM Plex Mono',monospace;font-size:.75rem}
+    [data-testid="stMetricValue"] {font-size:1.35rem !important;line-height:1.25 !important;white-space:normal;overflow:visible;text-overflow:clip}
+    [data-testid="stExpander"] {background:var(--white);border-color:var(--line) !important;border-radius:10px !important}
+    [data-testid="stTextArea"] textarea {background:#fff;border-color:#cad5cd;border-radius:8px;line-height:1.5}
+    [data-testid="stSelectbox"] > div > div {border-radius:8px}
     .subtle {font-size:.84rem;color:#6b7b70}
     code {font-family:'IBM Plex Mono',monospace}
+    @media (max-width:800px) {.block-container{padding-top:2rem} h1{font-size:2.35rem !important}.statline{gap:.8rem}}
     </style>
     """,
     unsafe_allow_html=True,
@@ -83,11 +110,8 @@ st.markdown(
 
 with st.sidebar:
     st.markdown("<div class='eyebrow' style='color:#d7aa63'>MM / COMPASS</div>", unsafe_allow_html=True)
-    st.header("Painel de casos")
+    st.header("Configuração")
     st.caption("SAP S/4HANA · Materials Management · Procure to Pay")
-    labels = {case["id"]: f'{case["id"]} · {case["titulo"]}' for case in CASES}
-    selection = st.selectbox("Chamado fictício", options=["personalizado"] + list(labels), index=1, format_func=lambda x: "Escrever meu chamado" if x == "personalizado" else labels[x])
-    selected = next((case for case in CASES if case["id"] == selection), None)
     st.divider()
     st.markdown("**Configuração do modelo**")
     provider = st.radio("Provedor", ["OpenAI API", "Ollama local"], index=1 if local_model_ready() else 0, horizontal=True)
@@ -110,17 +134,39 @@ with st.sidebar:
 st.markdown("<div class='eyebrow'>CENTRAL DE TRIAGEM · PROVA DE CONCEITO</div>", unsafe_allow_html=True)
 st.title("Cada orientação, uma evidência.")
 st.markdown("<div class='hero-sub'>Um assistente para transformar chamados de compras em uma triagem verificável, com fontes, perguntas úteis e uma parada obrigatória antes de decisões críticas.</div>", unsafe_allow_html=True)
+st.markdown(
+    "<div class='statline'><span><strong>8</strong> cenários de demonstração</span><span><strong>5</strong> artigos na base</span><span><strong>0</strong> ações executadas no SAP</span></div>",
+    unsafe_allow_html=True,
+)
+
+labels = {case["id"]: f'{case["id"]}  ·  {case["titulo"]}' for case in CASES}
+if "case_selection" not in st.session_state:
+    st.session_state["case_selection"] = "CH-01"
+if "ticket_text" not in st.session_state:
+    load_case()
+
+st.markdown("<div class='section-kicker'>01 / Escolha do cenário</div>", unsafe_allow_html=True)
+selection = st.selectbox(
+    "8 chamados fictícios disponíveis",
+    options=list(labels) + ["personalizado"],
+    format_func=lambda value: "Meu próprio chamado" if value == "personalizado" else labels[value],
+    key="case_selection",
+    on_change=load_case,
+    help="Selecione um dos oito casos preparados para a demonstração ou escreva um relato próprio.",
+)
+selected = next((case for case in CASES if case["id"] == selection), None)
+if selected:
+    st.caption(f'{SCENARIO.get(selected["cenario"], selected["cenario"])} · {selected["titulo"]} · documentos fictícios')
+else:
+    st.caption("Entrada livre · descreva um chamado relacionado a pedido, recebimento ou fatura.")
 
 left, right = st.columns([1.45, 1], gap="large")
 with left:
-    st.markdown("<div class='section-kicker'>01 / Entrada</div>", unsafe_allow_html=True)
-    default = selected["texto"] if selected else ""
-    ticket = st.text_area("Descreva o chamado", value=default, height=190, placeholder="Ex.: A fatura 510... está bloqueada para pagamento. Pedido 450..., item 10, sociedade 1000...")
+    st.markdown("<div class='section-kicker'>02 / Relato para análise</div>", unsafe_allow_html=True)
+    ticket = st.text_area("Descreva ou ajuste o chamado", key="ticket_text", height=190, placeholder="Ex.: A fatura 510... está bloqueada para pagamento. Pedido 450..., item 10, sociedade 1000...")
     go = st.button("Analisar chamado  →", type="primary", use_container_width=True)
-    if selected:
-        st.caption(f'Cenário de demonstração: {selected["cenario"].replace("_", " ")} · documentos fictícios')
 with right:
-    st.markdown("<div class='section-kicker'>02 / Regras de operação</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-kicker'>03 / Limites de autonomia</div>", unsafe_allow_html=True)
     with st.container(border=True):
         st.markdown("**O assistente pode**")
         st.write("Interpretar o relato, consultar a base local, listar hipóteses e verificações, pedir dados e encaminhar o caso.")
@@ -138,7 +184,7 @@ if "result" in st.session_state:
     result = st.session_state["result"]
     st.divider()
     label, tone = STATUS.get(result["status"], (result["status"], "neutral"))
-    st.markdown("<div class='section-kicker'>03 / Resultado da triagem</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-kicker'>04 / Resultado da triagem</div>", unsafe_allow_html=True)
     st.markdown(f"<span class='status {tone}'>{label}</span>", unsafe_allow_html=True)
     st.subheader(safe_md(result["summary"]))
     if "[DOC_" in json.dumps(result, ensure_ascii=False):
